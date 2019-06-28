@@ -1,7 +1,7 @@
 /**
  *
- * @package     GZip Plugin
- * @copyright   Copyright (C) 2005 - 2018 Thierry Bela.
+ * @package     workerize
+ * @copyright   Copyright (C) 2005 - 2019 Thierry Bela.
  *
  * dual licensed
  *
@@ -23,10 +23,11 @@ export function serialize(task) {
         isAsync = Object.getPrototypeOf(task).constructor.name === 'AsyncFunction',
         body;
 
-    const data = source.match(/^((class)|((async\s+)?(function)?))\s*([^{(]*)[({]/);
+    const data = source.match(/^((class)|((async\s+)?function))\s*([^{(]*)[({]/);
+
 
     type = data[1];
-    let name = data[6].trim().replace(/[\s(].*/, '') || '';
+    let name = data[5].trim().replace(/[\s(].*/, '');
 
     body = type + ' ' + (name === '' ? task.name : name) + source.substring((type + (name === '' ? name : ' ' + name)).length);
 

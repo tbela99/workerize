@@ -97,3 +97,7 @@ import {
     dispose(func, func2, func3);
 })();
 ```
+
+## A not about the proxies parameters
+
+All parameters you pass to the proxy must be [transferable](https://developer.mozilla.org/en-US/docs/Web/API/Transferable). Objects will be serialized and deserialized as JSON data.
