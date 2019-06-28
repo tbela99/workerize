@@ -100,4 +100,4 @@ import {
 
 ## A not about the proxies parameters
 
-All parameters you pass to the proxy must be [transferable](https://developer.mozilla.org/en-US/docs/Web/API/Transferable). Objects will be serialized and deserialized as JSON data.
+All parameters you pass to the proxy must be [transferable](https://developer.mozilla.org/en-US/docs/Web/API/Transferable). Objects will be serialized and deserialized as JSON data. All methods, property settter and gettter are removed.
