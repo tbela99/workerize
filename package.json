@@ -1,0 +1,14 @@
+{
+  "name": "Workerize",
+  "description": "Export functions and class into a service worker",
+  "version": "1.0.0",
+  "scripts": {
+    "build-test": "./build.sh"
+  },
+  "devDependencies": {
+    "webpack": "^4.35.0",
+    "webpack-cli": "^3.3.5"
+  },
+  "license": "(MIT OR LGPL-3.0-only)",
+  "repository": "github:tbela99/workerize"
+}
