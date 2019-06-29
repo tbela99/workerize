@@ -19,7 +19,7 @@ export function serialize(task) {
 
     const source = task.toString().trim();
 
-    let type = 'function',
+    let type = '',
         isAsync = Object.getPrototypeOf(task).constructor.name === 'AsyncFunction',
         body;
 
@@ -34,6 +34,11 @@ export function serialize(task) {
     if (name === '') {
 
         name = task.name;
+    }
+
+    if (type === '') {
+
+        type = 'function';
     }
 
     return {
