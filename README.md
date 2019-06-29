@@ -63,48 +63,6 @@ import {
 
 (async function () {
 
-    const Class = (workerize(class {
-
-        constructor() {
-
-        }
-
-        async callMeAsync(foo) {
-
-            return foo + ' was async parameter'
-        }
-
-        watch() {
-            console.info('started watching sync ...' + [].slice.apply(arguments).join());
-            return 'ACK';
-        }
-
-        square(x) {
-
-            return x * x
-        }
-    }));
-
-    const instance = new Class;
-
-    let response = await instance.watch('we had an argument');
-
-    console.log({
-        response
-    })
-
-    response = await instance.square(2);
-
-    console.log({
-        response
-    });
-
-    response = await instance.callMeAsync(2);
-
-    console.log({
-        response
-    });
-
     const func = workerize(function () {
 
         return [].slice.apply(arguments);
