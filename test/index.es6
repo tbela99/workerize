@@ -76,6 +76,14 @@ import {
         response: response.join(' - ')
     });
 
+    const func4 = workerize((...args) => ['func4'].concat(args));
+
+    response = await func4('arrow', 'function', 'running', 'from', 'worker');
+
+    console.log({
+        response: response.join(' - ')
+    });
+
     // terminate the service workers
-    dispose(instance, func, func2, func3);
+    dispose(instance, func, func2, func3, func4);
 })()

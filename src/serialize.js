@@ -23,7 +23,7 @@ export function serialize(task) {
         isAsync = Object.getPrototypeOf(task).constructor.name === 'AsyncFunction',
         body;
 
-    const data = source.match(/^((class)|((async\s+)?function))\s*([^{(]*)[({]/);
+    const data = source.match(/^((class)|((async\s+)?function)?)\s*([^{(]*)[({]/);
 
 
     type = data[1];
