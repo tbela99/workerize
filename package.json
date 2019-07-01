@@ -1,14 +1,29 @@
 {
-  "name": "Workerize",
+  "name": "workerize",
   "description": "Export functions and class into a service worker",
   "version": "1.0.0",
   "scripts": {
-    "build-test": "./build.sh"
+    "build": "./node_modules/rollup/bin/rollup -f umd -n workerize -- ./src/index.js",
+    "build-test": "./node_modules/rollup/bin/rollup -f umd -n workerize -- test/index.es6 > test/index.js"
   },
   "devDependencies": {
-    "webpack": "^4.35.0",
-    "webpack-cli": "^3.3.5"
+    "rollup": "^1.16.3"
   },
-  "license": "(MIT OR LGPL-3.0-only)",
-  "repository": "github:tbela99/workerize"
+  "license": "MIT OR LGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tbela99/workerize.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tbela99/workerize/issues"
+  },
+  "homepage": "https://github.com/tbela99/workerize#readme",
+  "main": "dist/workerize.js",
+  "dependencies": {},
+  "keywords": [
+    "worker",
+    "async"
+  ],
+  "author": "Thierry Bela",
+  "files": ["dist"]
 }

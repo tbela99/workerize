@@ -4,13 +4,12 @@ DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 cd $DIR
 #
 #
-if [ ! -f ./node_modules/webpack-cli/bin/cli.js ]; then
+if [ ! -f ./node_modules/rollup/bin/rollup ]; then
     echo "Please run 'npm install' and try again"
     exit 1
 fi
 set -x
 #
 #
-#webpack index=./src/index.js --mode development --output-library-target umd --output-path='./dist' --output-filename='workerize.js'
-webpack index=./test/index.es6 --mode development --output-library-target umd --output-path='./test' --output-filename='[name].js'
-  
+./node_modules/rollup/bin/rollup -f umd -n workerize -- ./src/index.js
+./node_modules/rollup/bin/rollup -f umd -n workerize -- test/index.es6 > test/index.js  
