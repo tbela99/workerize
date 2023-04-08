@@ -3,7 +3,7 @@ Export functions or class into a service worker context.
 
 ## Using a class
 
-All class method are turned into async proxies
+All class methods are turned into async proxies
 
 ```javascript
 
@@ -12,7 +12,7 @@ import {
     dispose
 } from "../src/worker.js";
 
-(async () {
+(async function () {
 
     const Rectangle = workerize(class {
 
@@ -102,6 +102,45 @@ import {
 
     // terminate the service workers
     dispose(instance, func, func2, func3, func4);
+})();
+
+```
+## Injecting dependencies
+
+you can inject javascript libraries into the worker context
+
+```javascript
+
+import {
+    workerize,
+    dispose
+} from "../src/worker.js";
+
+(async function () {
+
+    const animal = workerize(function (...args) {
+
+        // Animal is defined in './js/animal.js'
+        const cat = new Animal(...args)
+
+        return cat.say();
+    }, ['./js/animal.js']);
+
+    const message = await animal('Cat', 2, 'Charlie');
+    
+    console.log(message); // "Charlie says: I am a 2 year(s) old Cat"
+
+    const compute = workerize(function (...args: number[]) {
+
+        // sum is defined in './js/sum.js'
+        return sum(...args);
+    }, ['./js/sum.js']);
+    
+    const sum = await compute(15, -5, 1);
+    
+    console.log(sum); // 11
+    
+    dispose(animal, compute);
 })();
 
 ```

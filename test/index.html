@@ -1,78 +1,35 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<script src="./index.js"></script>
-<p>Open the browser console please</p>
-<pre>
-    import {
-        workerize,
-        dispose
-    } from "../src/worker.js";
-    
-    (async function () {
-    
-        const worker = new(workerize(class {
-    
-            constructor() {
-    
-            }
-    
-            async callMeAsync(foo) {
-    
-                return foo + ' was async parameter'
-            }
-    
-            watch() {
-                console.info('started watching sync ...');
-                return 'ACK';
-            }
-    
-            square(x) {
-    
-                return x * x
-            }
-        }))();
-    
-        let response = await worker.watch('we had an argument');
-    
-        console.log({
-            response
-        })
-    
-        response = await worker.square(2);
-    
-        console.log({
-            response
-        });
-    
-        response = await worker.callMeAsync(2);
-    
-        console.log({
-            response
-        });
-    
-        const func = workerize(function () {
-    
-            return [].slice.apply(arguments);
-        });
-    
-        response = await func('function', 'running', 'from', 'worker');
-    
-        console.log({
-            response: response.join(' ')
-        });
-    
-        const func2 = workerize(async function () {
-    
-            return [].slice.apply(arguments);
-        });
-    
-        response = await func2('async', 'function', 'running', 'from', 'worker');
-        console.log({
-            response: response.join(' ')
-        });
-    
-        // terminate the service workers
-        dispose(worker, func, func2);
-    })()
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="../dist/index.js"></script>
+<script>
 
-</pre>
+    const fn = workerize.workerize(function (...args) {
+
+        const cat = new Animal(...args)
+
+        return cat.say();
+    }, ['./js/animal.js']);
+
+    fn('Cat', 2, 'Charlie').then(x => console.log(x));
+
+    const Greeter = workerize.workerize(class {
+        async greet(number) {
+
+            let string = '';
+
+            while (number--) {
+
+                string += String.fromCharCode([65, 97][Math.floor(2 * Math.random())] + Math.floor(26 * Math.random()))
+            }
+
+            return `Welcome ${string}`;
+        }
+    });
+
+    const greeter = new Greeter;
+
+    // console.log({greeter});
+
+    greeter.greet(6).then(greet => console.log(greet));
+</script>
