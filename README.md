@@ -1,6 +1,12 @@
 # Workerize
 Export functions or class into a service worker context. 
 
+## Installation
+
+```shell
+$ npm i @tbela99/workerize
+```
+
 ## Using a class
 
 All class methods are turned into async proxies

@@ -19,19 +19,20 @@ import {ClassOrFunctionType, SerializedTask} from "./@types";
 import {generate} from "./generate";
 
 const map: Map<string, Function[]> = new Map;
-const store: WeakMap<Function, Worker> = new WeakMap;
+const store: WeakMap<Function, {worker: Worker, url: string}> = new WeakMap;
 
 export function dispose(...args: Function[]) {
 
     for (let instance of args) {
 
         // @ts-ignore
-        const worker: Worker | null = store.get(instance);
+        const data: {worker: Worker, url: string} | null = store.get(instance);
 
-        if (worker != null) {
+        if (data != null) {
 
+            URL.revokeObjectURL(data.url);
             store.delete(instance);
-            worker.terminate();
+            data.worker.terminate();
         }
     }
 }
@@ -68,12 +69,14 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
             constructor(...args: any[]) {
 
-                const worker: Worker = new Worker(URL.createObjectURL(new Blob([data], {
+                const url: string = URL.createObjectURL(new Blob([data], {
                     type: 'text/javascript'
-                })));
+                }));
+
+                const worker: Worker = new Worker(url);
 
                 // @ts-ignore
-                store.set(this, worker);
+                store.set(this, {worker, url});
 
                 worker.onmessage = onMessageHandler;
 
@@ -124,9 +127,10 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
     } else {
 
-        const worker: Worker = new Worker(URL.createObjectURL(new Blob([data], {
+        const url: string = URL.createObjectURL(new Blob([data], {
             type: 'text/javascript'
-        })));
+        }));
+        const worker: Worker = new Worker(url);
 
         worker.onmessage = onMessageHandler;
 
@@ -150,7 +154,7 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
             })
         }
 
-        store.set(runner, worker);
+        store.set(runner, {worker, url});
     }
 
     return runner;

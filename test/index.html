@@ -11,7 +11,7 @@
         return cat.say();
     }, ['./js/animal.js']);
 
-    fn('Cat', 2, 'Charlie').then(x => console.log(x));
+    fn('Cat', 2, 'Charlie').then(x => console.log(x)).then(() => workerize.dispose(fn));
 
     const Greeter = workerize.workerize(class {
         async greet(number) {
@@ -31,5 +31,5 @@
 
     // console.log({greeter});
 
-    greeter.greet(6).then(greet => console.log(greet));
+    greeter.greet(6).then(greet => console.log(greet)).then(() => workerize.dispose(greeter));
 </script>

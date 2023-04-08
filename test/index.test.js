@@ -117,11 +117,12 @@ self.onmessage = async function (e) {
         if (serialized.type == 'class') {
             runner = class {
                 constructor(...args) {
-                    const worker = new Worker(URL.createObjectURL(new Blob([data], {
+                    const url = URL.createObjectURL(new Blob([data], {
                         type: 'text/javascript'
-                    })));
+                    }));
+                    const worker = new Worker(url);
                     // @ts-ignore
-                    store.set(this, worker);
+                    store.set(this, { worker, url });
                     worker.onmessage = onMessageHandler;
                     function proxy(method) {
                         return async function (...args) {
@@ -157,9 +158,10 @@ self.onmessage = async function (e) {
             };
         }
         else {
-            const worker = new Worker(URL.createObjectURL(new Blob([data], {
+            const url = URL.createObjectURL(new Blob([data], {
                 type: 'text/javascript'
-            })));
+            }));
+            const worker = new Worker(url);
             worker.onmessage = onMessageHandler;
             runner = async function (...args) {
                 const promiseid = id();
@@ -175,7 +177,7 @@ self.onmessage = async function (e) {
                     });
                 });
             };
-            store.set(runner, worker);
+            store.set(runner, { worker, url });
         }
         return runner;
     }

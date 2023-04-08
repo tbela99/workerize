@@ -9,17 +9,17 @@
  * @license     MIT License
  */
 
+interface Constructable<T> {
+    new(...args: any) : T;
+    [key: string]: Promise;
+}
+
 export interface SerializedTask {
 
     type: 'class' | 'function' | '',
     name: string,
     body: string,
     isAsync: boolean
-}
-
-interface Constructable<T> {
-    new(...args: any) : T;
-    [key: string]: Promise;
 }
 
 export declare type ClassOrFunctionType<T> = Function<T> | Constructable<T>;
