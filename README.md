@@ -16,7 +16,7 @@ All class methods are turned into async proxies
 import {
     workerize,
     dispose
-} from "./dist/index.js";
+} from "@tbela99/workerize";
 
 (async function () {
 
@@ -65,7 +65,7 @@ The function is turned into an async proxy
 import {
     workerize,
     dispose
-} from "./dist/index.js";
+} from "@tbela99/workerize";
 
 (async function () {
 
@@ -120,7 +120,7 @@ you can inject javascript libraries into the worker context
 import {
     workerize,
     dispose
-} from "./dist/index.js";
+} from "@tbela99/workerize";
 
 (async function () {
 
