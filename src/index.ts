@@ -11,4 +11,6 @@
 
 export * from "./worker";
 export * from "./generate"
+export * from './generate';
+export * from './serialize';
 

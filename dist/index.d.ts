@@ -14,6 +14,14 @@ interface Constructable<T> {
     [key: string]: Promise;
 }
 
+interface SerializedTask {
+
+    type: 'class' | 'function' | '',
+    name: string,
+    body: string,
+    isAsync: boolean
+}
+
 declare type ClassOrFunctionType<T> = Function<T> | Constructable<T>;
 
 /**
@@ -32,4 +40,17 @@ declare function workerize(task: Function, dependencies?: string[]): ClassOrFunc
 
 declare function generate(task: Function, dependencies?: string[]): string;
 
-export { dispose, generate, workerize };
+/**
+ *
+ * @package     workerize
+ * @copyright   Copyright (C) 2005 - 2023 Thierry Bela.
+ *
+ * dual licensed
+ *
+ * @license     LGPL v3
+ * @license     MIT License
+ */
+
+declare function serialize(task: Function): SerializedTask;
+
+export { dispose, generate, serialize, workerize };

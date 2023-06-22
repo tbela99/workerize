@@ -126,16 +126,18 @@ self.onmessage = async function (e) {
         const serialized = serialize(task);
         const data = generate(task, dependencies);
         let runner;
+        let url;
+        let worker;
         if (serialized.type == 'class') {
             runner = class {
                 constructor(...args) {
-                    const url = URL.createObjectURL(new Blob([data], {
+                    url = URL.createObjectURL(new Blob([data], {
                         type: 'text/javascript'
                     }));
-                    const worker = new Worker(url);
+                    worker = new Worker(url);
+                    worker.onmessage = onMessageHandler;
                     // @ts-ignore
                     store.set(this, { worker, url });
-                    worker.onmessage = onMessageHandler;
                     function proxy(method) {
                         return async function (...args) {
                             const promiseid = id();
@@ -144,6 +146,7 @@ self.onmessage = async function (e) {
                                     resolve,
                                     reject
                                 ]);
+                                worker.onerror = reject;
                                 worker.postMessage({
                                     id: promiseid,
                                     method,
@@ -170,10 +173,10 @@ self.onmessage = async function (e) {
             };
         }
         else {
-            const url = URL.createObjectURL(new Blob([data], {
+            url = URL.createObjectURL(new Blob([data], {
                 type: 'text/javascript'
             }));
-            const worker = new Worker(url);
+            worker = new Worker(url);
             worker.onmessage = onMessageHandler;
             runner = async function (...args) {
                 const promiseid = id();
@@ -196,6 +199,7 @@ self.onmessage = async function (e) {
 
     exports.dispose = dispose;
     exports.generate = generate;
+    exports.serialize = serialize;
     exports.workerize = workerize;
 
 }));

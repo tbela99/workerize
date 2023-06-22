@@ -19,14 +19,14 @@ import {ClassOrFunctionType, SerializedTask} from "./@types";
 import {generate} from "./generate";
 
 const map: Map<string, Function[]> = new Map;
-const store: WeakMap<Function, {worker: Worker, url: string}> = new WeakMap;
+const store: WeakMap<Function, { worker: Worker, url: string }> = new WeakMap;
 
 export function dispose(...args: Function[]) {
 
     for (let instance of args) {
 
         // @ts-ignore
-        const data: {worker: Worker, url: string} | null = store.get(instance);
+        const data: { worker: Worker, url: string } | null = store.get(instance);
 
         if (data != null) {
 
@@ -62,6 +62,8 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
     const data: string = generate(task, dependencies);
 
     let runner: ClassOrFunctionType<Function>;
+    let url: string;
+    let worker: Worker;
 
     if (serialized.type == 'class') {
 
@@ -69,16 +71,16 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
             constructor(...args: any[]) {
 
-                const url: string = URL.createObjectURL(new Blob([data], {
+                url = URL.createObjectURL(new Blob([data], {
                     type: 'text/javascript'
                 }));
 
-                const worker: Worker = new Worker(url);
+                worker = new Worker(url);
+
+                worker.onmessage = onMessageHandler;
 
                 // @ts-ignore
                 store.set(this, {worker, url});
-
-                worker.onmessage = onMessageHandler;
 
                 function proxy(method: string) {
 
@@ -91,8 +93,9 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
                             map.set(promiseid, [
                                 resolve,
                                 reject
-                            ])
+                            ]);
 
+                            worker.onerror = reject;
                             worker.postMessage({
                                 id: promiseid,
                                 method,
@@ -127,11 +130,11 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
     } else {
 
-        const url: string = URL.createObjectURL(new Blob([data], {
+        url = URL.createObjectURL(new Blob([data], {
             type: 'text/javascript'
         }));
-        const worker: Worker = new Worker(url);
 
+        worker = new Worker(url);
         worker.onmessage = onMessageHandler;
 
         runner = async function (...args: any[]): Promise<any> {

@@ -120,16 +120,18 @@ function workerize(task, dependencies = []) {
     const serialized = serialize(task);
     const data = generate(task, dependencies);
     let runner;
+    let url;
+    let worker;
     if (serialized.type == 'class') {
         runner = class {
             constructor(...args) {
-                const url = URL.createObjectURL(new Blob([data], {
+                url = URL.createObjectURL(new Blob([data], {
                     type: 'text/javascript'
                 }));
-                const worker = new Worker(url);
+                worker = new Worker(url);
+                worker.onmessage = onMessageHandler;
                 // @ts-ignore
                 store.set(this, { worker, url });
-                worker.onmessage = onMessageHandler;
                 function proxy(method) {
                     return async function (...args) {
                         const promiseid = id();
@@ -138,6 +140,7 @@ function workerize(task, dependencies = []) {
                                 resolve,
                                 reject
                             ]);
+                            worker.onerror = reject;
                             worker.postMessage({
                                 id: promiseid,
                                 method,
@@ -164,10 +167,10 @@ function workerize(task, dependencies = []) {
         };
     }
     else {
-        const url = URL.createObjectURL(new Blob([data], {
+        url = URL.createObjectURL(new Blob([data], {
             type: 'text/javascript'
         }));
-        const worker = new Worker(url);
+        worker = new Worker(url);
         worker.onmessage = onMessageHandler;
         runner = async function (...args) {
             const promiseid = id();
@@ -188,4 +191,4 @@ function workerize(task, dependencies = []) {
     return runner;
 }
 
-export { dispose, generate, workerize };
+export { dispose, generate, serialize, workerize };

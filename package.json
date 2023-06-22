@@ -1,7 +1,7 @@
 {
   "name": "@tbela99/workerize",
   "description": "Export functions and class into a web worker",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "main": "dist/index.mjs",
   "browser": "dist/index.js",
   "module": "dist/index.mjs",
@@ -12,12 +12,12 @@
   },
   "devDependencies": {
     "@esm-bundle/chai": "^4.3.4-fix.0",
-    "@rollup/plugin-node-resolve": "^15.0.1",
-    "@rollup/plugin-typescript": "^11.0.0",
-    "@web/test-runner": "^0.15.3",
-    "rollup": "^3.20.1",
+    "@rollup/plugin-node-resolve": "^15.1.0",
+    "@rollup/plugin-typescript": "^11.1.1",
+    "@web/test-runner": "^0.16.1",
+    "rollup": "^3.25.1",
     "rollup-plugin-dts": "^5.3.0",
-    "tslib": "^2.5.0"
+    "tslib": "^2.5.3"
   },
   "license": "MIT OR LGPL-3.0",
   "repository": {
