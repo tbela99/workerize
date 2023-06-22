@@ -17,7 +17,7 @@ All class methods are turned into async proxies
 import {
     workerize,
     dispose
-} from "../src/worker.js";
+} from "@tbela99/workerize";
 
 const Rectangle = workerize(class {
 
@@ -67,7 +67,7 @@ The function is turned into an async proxy
 import {
     workerize,
     dispose
-} from "../src/worker.js";
+} from "@tbela99/workerize";
 
 const func = workerize(function () {
 
@@ -120,7 +120,7 @@ you can inject javascript libraries into the worker context
 import {
     workerize,
     dispose
-} from "../src/worker.js";
+} from "@tbela99/workerize";
 
 const animal = workerize(function (...args) {
 
