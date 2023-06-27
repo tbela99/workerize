@@ -1,4 +1,8 @@
-/* generate from test/index.test.ts */
+/* generate from test/index.node.ts */
+import { Worker } from 'node:worker_threads';
+import { dirname, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+
 /**
  *
  * @package     workerize
@@ -55,88 +59,49 @@ function generate(task, options = {}) {
     const data = [];
     const code = [];
     const className = serialized.name !== '' ? serialized.name : `var${id().slice(0, 3)}`;
+    code.push(`const { parentPort } = require('node:worker_threads');`);
     code.push(serialized.name !== '' ? serialized.body : `const ${className} = ${serialized.body}`);
     if (serialized.type == 'class') {
         code.push(`let instance;
-self.onmessage = async function (e) {
-    if (e.data.method == "constructor") {
-        instance = new ${className}(...e.data.args);
-    } else {
-        if (Object.getPrototypeOf(instance[e.data.method]).constructor.name === "AsyncFunction") {
-            postMessage({id: e.data.id, data: await instance[e.data.method](...e.data.args)});
-        } else {
-            postMessage({id: e.data.id, data: instance[e.data.method](...e.data.args)});
-        }
-    }
-}`);
+        parentPort.on('message', async function (e) {
+        
+            if (e.method == "constructor") {
+                instance = new ${className}(...e.args);
+            } else {
+                if (Object.getPrototypeOf(instance[e.method]).constructor.name === "AsyncFunction") {
+                    parentPort.postMessage({id: e.id, data: await instance[e.method](...e.args)});
+                } else {
+                    parentPort.postMessage({id: e.id, data: instance[e.method](...e.args)});
+                }
+            }
+        })
+`);
     }
     else {
-        code.push(`self.onmessage = async function (e) {
-        postMessage({id: e.data.id, data:${serialized.isAsync ? ' await' : ''} ${className}(...e.data.args)});
-}`);
+        code.push(`parentPort.on('message', async function (e) {
+        
+    parentPort.postMessage({id: e.id, data:${serialized.isAsync ? ' await' : ''} ${className}(...e.args)});
+})`);
     }
     if (!options.module) {
+        data.push(`const {runInThisContext} = require('vm');`);
         // @ts-ignore
-        if (options.dependencies.length > 0) {
+        if (options?.dependencies?.length > 0) {
             // @ts-ignore
-            data.push(`importScripts(${options.dependencies.map((str) => '' + JSON.stringify(new URL(str, self.location.toString())))});`);
+            data.push(`${options.dependencies.reduce((acc, str) => acc + 'runInThisContext(' + JSON.stringify(readFileSync(!str.startsWith('/') && !str.match(/^[a-z]+:/) ? dirname(process.argv[1]) + '/' + str : str, 'utf-8')) + ');\n', '')}
+;`);
         }
     }
     else {
         // @ts-ignore
         if (options?.dependencies?.length > 0) {
-            data.push(`const promisedModules = Promise.all(${JSON.stringify(options.dependencies?.map(dep => new URL(dep, self.location.href).href))}.map(url => import(url)));
-                
-                let modules = null;
-                `);
+            // @ts-ignore
+            const deps = options.dependencies.map((str) => resolve(process.cwd(), !str.startsWith('/') && !str.match(/^[a-z]+:/) ? dirname(process.argv[1]) + '/' + str : str));
+            data.push(`Promise.all(${JSON.stringify(deps)}.map(url => import(url))).then(modules => {
+                ${code.join('\n')}
+            });`);
             code.length = 0;
-            code.push(serialized.name !== '' ? serialized.body : `const ${className} = ${serialized.body}`);
-            if (serialized.type == 'class') {
-                code.push(`let instance;
-self.onmessage = async function (e) {
-
-    if (modules == null) {
-    
-        modules = await promisedModules;
-    }
-    
-    if (e.data.method == "constructor") {
-        instance = new ${className}(...e.data.args);
-    } else {
-        if (Object.getPrototypeOf(instance[e.data.method]).constructor.name === "AsyncFunction") {
-            postMessage({id: e.data.id, data: await instance[e.data.method](...e.data.args)});
-        } else {
-            postMessage({id: e.data.id, data: instance[e.data.method](...e.data.args)});
         }
-    }
-}`);
-            }
-            else {
-                code.push(`self.onmessage = async function (e) {
-                    
-        if (modules == null) {
-        
-            modules = await promisedModules;
-        }
-    
-        postMessage({id: e.data.id, data:${serialized.isAsync ? ' await' : ''} ${className}(...e.data.args)});
-}`);
-            }
-        }
-        //
-        // @ts-ignore
-        // if (options.dependencies.length > 0) {
-        //
-        //     // @ts-ignore
-        //     data.push(`import(${options.dependencies.map((str: string) => '' + JSON.stringify(new URL(str, self.location.toString())))}).then(modules => {
-        //     console.debug(modules);
-        //         ${code.join('\n')}
-        //     });
-        //     console.debug('done');
-        //     `);
-        //
-        //     code.length = 0;
-        // }
     }
     return data.concat(code).join('\n');
 }
@@ -153,51 +118,46 @@ self.onmessage = async function (e) {
  */
 const map = new Map;
 const store = new WeakMap;
-async function dispose(...args) {
+function dispose(...args) {
+    const list = [];
     for (let instance of args) {
         // @ts-ignore
         const data = store.get(instance);
         if (data != null) {
-            URL.revokeObjectURL(data.url);
             store.delete(instance);
-            data.worker.terminate();
+            list.push(data.worker.terminate());
         }
     }
+    return Promise.all(list);
 }
 function onMessageHandler(e) {
-    const data = map.get(e.data.id);
+    const data = map.get(e.id);
     if (data != null) {
-        if (e.data.type == 'error') {
+        if (e.type == 'error') {
             // reject
-            data[1](e.data.data);
+            data[1](e.data);
         }
         else {
             //resolve
-            data[0](e.data.data);
+            data[0](e.data);
         }
-        map.delete(e.data.id);
+        map.delete(e.id);
     }
 }
-// @ts-ignore
 function workerize(task, options = {}) {
     options = Object.assign({ dependencies: [], module: false, signal: null }, options);
     const serialized = serialize(task);
     const data = generate(task, options);
-    const workerOptions = options.module ? { type: 'module' } : {};
+    const workerOptions = { eval: true };
     let runner;
-    let url;
     let worker;
-    url = URL.createObjectURL(new Blob([data], {
-        type: 'text/javascript'
-    }));
     if (serialized.type == 'class') {
         runner = class {
             constructor(...args) {
+                worker = new Worker(data, workerOptions);
+                worker.on('message', onMessageHandler);
                 // @ts-ignore
-                worker = new Worker(url, workerOptions);
-                worker.onmessage = onMessageHandler;
-                // @ts-ignore
-                store.set(this, { worker, url });
+                store.set(this, { worker });
                 function proxy(method) {
                     return async function (...args) {
                         const promiseid = id();
@@ -206,7 +166,7 @@ function workerize(task, options = {}) {
                                 resolve,
                                 reject
                             ]);
-                            worker.onerror = reject;
+                            worker.on('error', reject);
                             worker.postMessage({
                                 id: promiseid,
                                 method,
@@ -233,16 +193,13 @@ function workerize(task, options = {}) {
         };
     }
     else {
-        // @ts-ignore
-        worker = new Worker(url, workerOptions);
-        worker.onmessage = onMessageHandler;
-        worker.onerror = (error) => {
-            throw error;
-        };
+        worker = new Worker(data, workerOptions);
+        worker.on('message', onMessageHandler);
         runner = async function (...args) {
             const promiseid = id();
             return new Promise(function (resolve, reject) {
-                worker.onerror = reject;
+                worker.once('error', reject);
+                worker.once('messageerror', reject);
                 map.set(promiseid, [
                     resolve,
                     reject
@@ -253,7 +210,7 @@ function workerize(task, options = {}) {
                 });
             });
         };
-        store.set(runner, { worker, url });
+        store.set(runner, { worker });
     }
     if (options.signal != null) {
         options.signal.addEventListener('abort', () => dispose(runner));
@@ -848,26 +805,27 @@ var o=e("type-detect");function r(){this._key="chai/deep-eql__"+Math.random()+Da
             return foo + ' was async parameter';
         }
         watch(...args) {
-            // console.info('started watching sync ...' + args);
             return 'ACK';
         }
         square(x) {
             return x * x;
         }
     });
-    const instance = new Class;
-    describe('web: test class', () => {
-        it('test class: calling method #1', async function () {
+    describe('node: test class', () => {
+        it('node: test class: calling method #1', async function () {
+            const instance = new Class;
             // assertions here
-            f(await instance.watch('we had an argument')).equals('ACK');
+            return instance.watch('we had an argument').then((result) => dispose(instance).then(() => f(result).equals('ACK')));
         });
-        it('test class: calling method #2', async function () {
+        it('node: test class: calling method #2', async function () {
+            const instance = new Class;
             // assertions here
-            f(await instance.square(2)).equals(4);
+            return instance.square(2).then((result) => dispose(instance).then(() => f(result).equals(4)));
         });
-        it('test class: calling async method #3', async function () {
+        it('node: test class: calling async method #3', async function () {
+            const instance = new Class;
             // assertions here
-            f(await instance.callMeAsync(2)).equals('2 was async parameter');
+            return instance.callMeAsync(2).then((result) => dispose(instance).then(() => f(result).equals('2 was async parameter')));
         });
     });
     const func = workerize(function (...args) {
@@ -878,51 +836,51 @@ var o=e("type-detect");function r(){this._key="chai/deep-eql__"+Math.random()+Da
     });
     const func3 = workerize(async (...args) => ['func3'].concat(args));
     const func4 = workerize((...args) => ['func4'].concat(args));
-    describe('web: test functions', function () {
-        it('test function: calling function #1', async function () {
+    describe('node: test modules', function () {
+        it('node: test function: calling function #1', async function () {
             return func('function', 'running', 'from', 'worker').then((result) => dispose(func).then(() => f(result.join(' ')).equals('function running from worker')));
         });
-        it('test function: calling async function #2', async function () {
+        it('node: test function: calling async function #2', async function () {
             return func2('async', 'function', 'running', 'from', 'worker').then((result) => dispose(func2).then(() => f(result.join(' ')).equals('async function running from worker')));
         });
-        it('test function: calling function #3', async function () {
+        it('node: test function: calling function #3', async function () {
             return func3('async', 'function', 'running', 'from', 'worker').then((result) => dispose(func3).then(() => f(result.join(' - ')).equals('func3 - async - function - running - from - worker')));
         });
-        it('test function: calling async function #4', async function () {
+        it('node: test function: calling async function #4', async function () {
             return func4('arrow', 'function', 'running', 'from', 'worker').then((result) => dispose(func4).then(() => f(result.join(' - ')).equals('func4 - arrow - function - running - from - worker')));
         });
     });
     const func5 = workerize(function (...args) {
         // @ts-ignore
         return sum(...args);
-    }, { dependencies: ['./js/sum.js'] });
+    }, { dependencies: ['./test/js/sum.js'] });
     const func6 = workerize(function (...args) {
         // @ts-ignore
         const cat = new Animal(...args);
         return cat.say();
     }, { dependencies: ['./js/animal.js'] });
-    describe('web: dependencies test', function () {
-        it('calling function from external dependency #1', async function () {
-            return await func5(15, -5, 1).then((result) => dispose(func5).then(() => f(result).equals(11)));
-        });
-        it('calling method from external class #2', async function () {
-            return func6('Cat', 2, 'Charlie').then((result) => dispose(func6).then(() => f(result).equals("Charlie says: I am a 2 year(s) old Cat")));
-        });
-    });
     const func7 = workerize(function (...args) {
         // @ts-ignore
-        return modules[0].add(...args);
-    }, { dependencies: ['./js/add.js'], module: true });
+        return modules[0].sum(...args);
+    }, { dependencies: ['./test/js/sum.js'], module: true });
     const func8 = workerize(function (...args) {
         // @ts-ignore
         const cat = new modules[0].Animal(...args);
         return cat.say();
-    }, { dependencies: ['./js/animal.mjs'], module: true });
-    describe('web: module dependencies test', async function () {
-        it('calling function from esm module #1', async function () {
+    }, { dependencies: ['./test/js/animal.mjs'] });
+    describe('node: dependencies test', async function () {
+        it('calling function from external dependency #1', async function () {
+            return func5(15, -5, 1).then((result) => dispose(func5).then(() => f(result).equals(11)));
+        });
+        it('node: calling method from external class #2', async function () {
+            return func6('Cat', 2, 'Charlie').then((result) => dispose(func6).then(() => f(result).equals("Charlie says: I am a 2 year(s) old Cat")));
+        });
+    });
+    describe('node: cjs module dependencies test', async function () {
+        it('calling function from cjs module #1', async function () {
             return func7(15, -5, 1).then((result) => dispose(func7).then(() => f(result).equals(11)));
         });
-        it('esm calling class instance method from esm module #2', async function () {
+        it('node: calling class method from esm module #2', async function () {
             return func8('Dog', 2, 'Max').then((result) => dispose(func8).then(() => f(result).equals("Max says: I am a 2 year(s) old Dog")));
         });
     });

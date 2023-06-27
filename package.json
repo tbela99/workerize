@@ -1,23 +1,28 @@
 {
   "name": "@tbela99/workerize",
   "description": "Export functions and class into a web worker",
-  "version": "1.1.1",
-  "main": "dist/index.mjs",
-  "browser": "dist/index.js",
-  "module": "dist/index.mjs",
+  "version": "2.0.0",
+  "main": "dist/node/index.js",
+  "browser": "dist/web/index.js",
+  "module": "dist/node/index.js",
+  "type": "module",
   "typings": "dist/index.d.ts",
   "scripts": {
-    "build": "./node_modules/rollup/dist/bin/rollup -c",
-    "test": "web-test-runner \"test/**/*.test.js\" \"test/js/*.js\" --node-resolve --root-dir=./test/"
+    "build": "rollup -c",
+    "debug": "web-test-runner \"test/**/*.test.js\" --manual --open --node-resolve --root-dir=./test/",
+    "test": "web-test-runner \"test/**/*.test.js\" --node-resolve --root-dir=./test/; mocha \"test/*.node.mjs\""
   },
   "devDependencies": {
     "@esm-bundle/chai": "^4.3.4-fix.0",
-    "@rollup/plugin-node-resolve": "^15.0.1",
-    "@rollup/plugin-typescript": "^11.0.0",
-    "@web/test-runner": "^0.15.3",
-    "rollup": "^3.20.1",
+    "@rollup/plugin-node-resolve": "^15.1.0",
+    "@rollup/plugin-typescript": "^11.1.1",
+    "@types/mocha": "^10.0.1",
+    "@web/test-runner": "^0.16.1",
+    "glob": "^10.3.0",
+    "mocha": "^10.2.0",
+    "rollup": "^3.25.1",
     "rollup-plugin-dts": "^5.3.0",
-    "tslib": "^2.5.0"
+    "tslib": "^2.5.3"
   },
   "license": "MIT OR LGPL-3.0",
   "repository": {
@@ -31,6 +36,10 @@
   "keywords": [
     "worker",
     "web-worker",
+    "node-worker",
+    "thread",
+    "browser",
+    "node",
     "async"
   ],
   "author": "Thierry Bela",

@@ -1,30 +1,58 @@
 import dts from 'rollup-plugin-dts';
 import typescript from "@rollup/plugin-typescript";
 import nodeResolve from "@rollup/plugin-node-resolve";
+import {glob} from "glob";
 
-export default [
+export default [...await glob('./test/*.test.ts').then(files => files.map(input => {
+    return {
+        input,
+        plugins: [nodeResolve(), typescript()],
+        output:
+            {
+                banner: `/* generate from ${input} */`,
+                file: `${input.replace(/\.ts$/, '.js')}`,
+                // entryFileNames: '[name].mjs',
+                // chunkFileNames: '[name].[hash].mjs',
+                format: 'es'
+            }
+    }
+}))
+    ,
+    ...await glob('./test/*.node.ts').then(files => files.map(input => {
+
+        return {
+            input,
+            cache: false,
+            plugins: [nodeResolve(), typescript()],
+            output:
+                {
+                    banner: `/* generate from ${input} */`,
+                    file: `${input.replace(/\.ts$/, '.mjs')}`,
+                    // entryFileNames: '[name].mjs',
+                    // chunkFileNames: '[name].[hash].mjs',
+                    format: 'es'
+                }
+        }
+    })),
     {
-        input: 'src/index.ts',
+        input: ['./src/web/index.ts', './src/node/index.ts'],
         plugins: [nodeResolve(), typescript()],
         output: [
             {
-                file: './dist/index.mjs',
+                dir: 'dist',
+                preserveModules: true,
                 format: 'es',
-            },
-            {
-                file: './dist/index.js',
-                format: 'umd',
-                name: 'workerize'
             }
         ]
     },
     {
-        input: 'test/index.test.ts',
+        input: 'src/web/index.ts',
         plugins: [nodeResolve(), typescript()],
         output: [
             {
-                file: './test/index.test.js',
+                file: './dist/browser.js',
                 format: 'umd',
+                name: 'workerize'
             }
         ]
     },
@@ -37,4 +65,4 @@ export default [
             format: 'es'
         }
     }
-]
+];
