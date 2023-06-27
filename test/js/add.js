@@ -1,6 +1,5 @@
 /**
  *
- * @package     workerize
  * @copyright   Copyright (C) 2005 - 2023 Thierry Bela.
  *
  * dual licensed
@@ -9,6 +8,7 @@
  * @license     MIT License
  */
 
-export * from './serialize';
-export * from './node';
+export function add(...args) {
 
+    return args.reduce((a, b) => a + b, 0);
+}

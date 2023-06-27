@@ -1,19 +1,9 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<script src="../dist/index.js"></script>
+<script src="../dist/index.mjs"></script>
 <script>
-
-    const fn = workerize.workerize(function (...args) {
-
-        const cat = new Animal(...args)
-
-        return cat.say();
-    }, ['./js/animal.js']);
-
-    fn('Cat', 2, 'Charlie').then(x => console.log(x)).then(() => workerize.dispose(fn));
-
-    const Greeter = workerize.workerize(class {
+    class Greeter {
         async greet(number) {
 
             let string = '';
@@ -25,11 +15,47 @@
 
             return `Welcome ${string}`;
         }
-    });
+    }
+    const fn = workerize.workerize(function (...args) {
 
-    const greeter = new Greeter;
+        const cat = new Animal(...args)
 
-    // console.log({greeter});
+        return cat.say();
+    }, {dependencies:['./js/animal.js']});
+
+    fn('Cat', 2, 'Charlie').then(x => console.log(x)).then(() => workerize.dispose(fn));
+
+    const WKGreeter = workerize.workerize(Greeter);
+
+    const greeter = new WKGreeter;
 
     greeter.greet(6).then(greet => console.log(greet)).then(() => workerize.dispose(greeter));
+
+
+    const fn2 = workerize.workerize(async function (...args) {
+
+            const cat = new modules[0].Animal(...args)
+
+            return cat.say();
+
+    }, {dependencies:['./js/animal.mjs'], module: true});
+
+    fn2('Mouse', 2, 'Mike').then(x => console.log(x)).then(() => workerize.dispose(fn2));
+
+    const fn3 = workerize.workerize(async function (...args) {
+
+        return modules[0].add(...args);
+
+        // console.debug(modules)
+
+    }, {dependencies:['./js/add.js'], module: true});
+
+    fn3(1, 2, 3).then(x => console.log(x)).then(() => workerize.dispose(fn3));
+
+    // const WKGreeter2 = workerize.workerize(Greeter, {module: true});
+    //
+    // const greeter2 = new WKGreeter2;
+    //
+    // greeter2.greet(6).then(greet => console.log(greet)).then(() => workerize.dispose(greeter2));
+
 </script>

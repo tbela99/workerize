@@ -1,6 +1,6 @@
 # Workerize
 
-Export functions or class into a service worker context.
+Export functions or class into a worker context in nodejs and web browser. Tasks are cancellable.
 
 ## Installation
 
@@ -8,9 +8,9 @@ Export functions or class into a service worker context.
 $ npm i @tbela99/workerize
 ```
 
-## Using a class
+the
 
-All class methods are turned into async proxies
+## Node usage
 
 ```javascript
 
@@ -19,48 +19,66 @@ import {
     dispose
 } from "@tbela99/workerize";
 
-const Rectangle = workerize(class {
-
-    construct(width, height) {
-
-        this.width = width;
-        this.height = height;
-    }
-
-    getWidth() {
-        return this.width;
-    }
-
-    getHeight() {
-        return this.height;
-    }
-
-    getSurface() {
-
-        return this.width * this.height;
-    }
-});
-
-const rectangle = new Rectangle(20, 12);
-
-const width = await rectangle.getWidth();
-
-console.log({width});
-
-const surface = await rectangle.getSurface();
-
-console.log({surface});
-
-// ...
-
-
-// later terminate the worker
-dispose(rectangle);
+// do node stuff
 ```
+
+## Web browser browser usage
+
+```javascript
+
+import {
+    workerize,
+    dispose
+} from "@tbela99/workerize/web";
+
+// do browser stuff
+```
+
+Alternatively, you can use the 'browser.js' script which uses the UMD module format.
+
+```html
+
+<script src="dist/browser.js"></script>
+<script>
+
+    const func = workerize.workerize(function () {
+        
+        // do something
+    })
+</script>
+```
+
 
 ## Using a function
 
-The function is turned into an async proxy
+The function is turned into an async proxy.
+
+### Web example
+```javascript
+
+import {
+    workerize,
+    dispose
+} from "@tbela99/workerize/web";
+
+// async and arrow functions can be passed as well 
+const func = workerize(function (...args) {
+
+    return args.reduce((acc, curr) => acc + curr, 0);
+});
+
+response = await func(1, 2, 70); // 74
+
+// terminate the service worker
+dispose(func);
+
+```
+
+## Using a class
+
+All class methods are turned into async proxies.
+
+### Node example
 
 ```javascript
 
@@ -69,51 +87,48 @@ import {
     dispose
 } from "@tbela99/workerize";
 
-const func = workerize(function () {
+// pass a class definition
+const Class = workerize(class {
 
-    return [].slice.apply(arguments);
+    type;
+    name;
+    age;
+
+    constructor(type, age, name = '') {
+
+        this.type = type;
+        this.age = age;
+        this.name = name;
+
+        if (name === '') {
+
+            let number = Math.floor(3 + 3 * Math.random());
+
+            while (number--) {
+
+                this.name += String.fromCharCode([65, 97][Math.floor(2 * Math.random())] + Math.floor(26 * Math.random()))
+            }
+        }
+    }
+
+    say() {
+
+        return `${this.name} says: I am a ${this.age} year(s) old ${this.type}`;
+    }
 });
 
-response = await func('function', 'running', 'from', 'worker');
+// create an instance 
+const dog = new Class('Dog', 2, 'Marvin');
 
-console.log({
-    response: response.join(' ')
-});
+console.log(await dog.say()); // 'Marin says: I am a 2 years(s) old Dog'
 
-const func2 = workerize(async function () {
-
-    return [].slice.apply(arguments);
-});
-
-response = await func2('async', 'function', 'running', 'from', 'worker');
-console.log({
-    response: response.join(' ')
-});
-
-const func3 = workerize(async (...args) => ['func3'].concat(args));
-
-response = await func3('async', 'function', 'running', 'from', 'worker');
-
-console.log({
-    response: response.join(' - ')
-});
-
-const func4 = workerize((...args) => ['func4'].concat(args));
-
-response = await func4('arrow', 'function', 'running', 'from', 'worker');
-
-console.log({
-    response: response.join(' - ')
-});
-
-// terminate the service workers
-dispose(instance, func, func2, func3, func4);
+// terminate the service worker
+dispose(dog);
 
 ```
-
 ## Injecting dependencies
 
-you can inject javascript libraries into the worker context
+You can inject javascript libraries into the worker context.
 
 ```javascript
 
@@ -122,31 +137,69 @@ import {
     dispose
 } from "@tbela99/workerize";
 
-const animal = workerize(function (...args) {
+const func = workerize(function (...args) {
 
-    // Animal is defined in './js/animal.js'
-    const cat = new Animal(...args)
-
-    return cat.say();
-}, ['./js/animal.js']);
-
-const message = await animal('Cat', 2, 'Charlie');
-
-console.log(message); // "Charlie says: I am a 2 year(s) old Cat"
-
-const compute = workerize(function (...args: number[]) {
-
-    // sum is defined in './js/sum.js'
+    // sum function is defined in ./js/sum.js
     return sum(...args);
-}, ['./js/sum.js']);
+}, {dependencies: ['./js/sum.js']});
 
-const sum = await compute(15, -5, 1);
+const result = await func(5, 43, 10);
 
-console.log(sum); // 11
+console.log(result); // 58
 
-dispose(animal, compute);
+dispose(func);
+
 ```
 
+## Injecting modules
+
+```javascript
+
+import {
+    workerize,
+    dispose
+} from "@tbela99/workerize";
+
+const func = workerize(function (...args) {
+
+    // an array called 'modules' containing the declared modules is injected in the scope
+    // modules are in the same order they are declared
+    // add is exported by the module ./js/add.js
+    return modules[0].add(...args);
+    
+}, {dependencies: ['./js/add.js'], module: true});
+
+const result = await func(5, 43, 10);
+
+console.log(result); // 58
+
+dispose(func);
+
+```
+
+## Documentation
+
+### Workerize
+
+parameters:
+- _task_: function or class to execute in the worker context.
+- _options_: optional, worker options.
+
+worker options:
+- _dependencies_: array. an array of javascript files to inject as module or dependencies
+- _module_: boolean. If true, dependencies are injected as modules. A variable of type array called 'modules' will be injected in the scope. it contains the injected modules in the same order as they were injected.
+- _signal_: optional. AbortSignal instance used to abort the worker execution and delete it
+
+### Dispose
+
+Delete the worker instance.
+
+#### Usage
+
+```javascript
+
+dispose(worker1 [, worker2, ..., workern]);
+```
 ## A note about the proxies parameters
 
 All parameters you pass to the proxy must
@@ -156,3 +209,7 @@ deserialized as JSON data. All methods, property settter and getter are removed.
 ## License
 
 MIT OR LGPL-3.0
+
+---
+
+Thanks to [Jetbrains](https://jetbrains.com) for providing a free WebStorm license

@@ -1,83 +1,6 @@
-/**
- *
- * @package     workerize
- * @copyright   Copyright (C) 2005 - 2023 Thierry Bela.
- *
- * dual licensed
- *
- * @license     LGPL v3
- * @license     MIT License
- */
-function serialize(task) {
-    const source = task.toString().trim();
-    let type, isAsync = Object.getPrototypeOf(task).constructor.name === 'AsyncFunction', body;
-    const data = source.match(/^((class)|((async\s+)?function)?)\s*([^{(]*)[({]/);
-    // @ts-ignore
-    type = data[1];
-    // @ts-ignore
-    let name = data[5].trim().replace(/[\s(].*/, '');
-    // @ts-ignore
-    body = (type + ' ' + (name === '' ? task.name : name) + source.substring((type + (name === '' ? name : ' ' + name)).length)).trim();
-    if (name === '') {
-        name = task.name;
-    }
-    if (isAsync && name == 'async') {
-        name = '';
-    }
-    if (type === '') {
-        type = 'function';
-    }
-    return {
-        type,
-        name,
-        body,
-        isAsync
-    };
-}
-
-/**
- *
- * @package     workerize
- * @copyright   Copyright (C) 2005 - 2023 Thierry Bela.
- *
- * dual licensed
- *
- * @license     LGPL v3
- * @license     MIT License
- */
-function id() {
-    return Number(Math.random().toString().substring(2)).toString(36);
-}
-
-function generate(task, dependencies = []) {
-    const serialized = serialize(task);
-    const data = [];
-    const className = serialized.name !== '' ? serialized.name : `var${id()}`;
-    if (dependencies.length > 0) {
-        data.push(`importScripts(${dependencies.map((str) => '' + JSON.stringify(new URL(str, self.location.toString())))});`);
-    }
-    data.push(serialized.name !== '' ? serialized.body : `const ${className} = ${serialized.body}`);
-    if (serialized.type == 'class') {
-        data.push(`let instance;
-self.onmessage = async function (e) {
-    if (e.data.method == "constructor") {
-        instance = new ${className}(...e.data.args);
-    } else {
-        if (Object.getPrototypeOf(instance[e.data.method]).constructor.name === "AsyncFunction") {
-            postMessage({id: e.data.id, data: await instance[e.data.method](...e.data.args)});
-        } else {
-            postMessage({id: e.data.id, data: instance[e.data.method](...e.data.args)});
-        }
-    }
-}`);
-    }
-    else {
-        data.push(`self.onmessage = async function (e) {
-        postMessage({id: e.data.id, data:${serialized.isAsync ? ' await' : ''} ${className}(...e.data.args)});
-}`);
-    }
-    return data.join('\n');
-}
+import { serialize } from '../serialize.js';
+import { id } from '../id.js';
+import { generate } from './generate.js';
 
 /**
  *
@@ -91,7 +14,7 @@ self.onmessage = async function (e) {
  */
 const map = new Map;
 const store = new WeakMap;
-function dispose(...args) {
+async function dispose(...args) {
     for (let instance of args) {
         // @ts-ignore
         const data = store.get(instance);
@@ -116,19 +39,23 @@ function onMessageHandler(e) {
         map.delete(e.data.id);
     }
 }
-function workerize(task, dependencies = []) {
+// @ts-ignore
+function workerize(task, options = {}) {
+    options = Object.assign({ dependencies: [], module: false, signal: null }, options);
     const serialized = serialize(task);
-    const data = generate(task, dependencies);
+    const data = generate(task, options);
+    const workerOptions = options.module ? { type: 'module' } : {};
     let runner;
     let url;
     let worker;
+    url = URL.createObjectURL(new Blob([data], {
+        type: 'text/javascript'
+    }));
     if (serialized.type == 'class') {
         runner = class {
             constructor(...args) {
-                url = URL.createObjectURL(new Blob([data], {
-                    type: 'text/javascript'
-                }));
-                worker = new Worker(url);
+                // @ts-ignore
+                worker = new Worker(url, workerOptions);
                 worker.onmessage = onMessageHandler;
                 // @ts-ignore
                 store.set(this, { worker, url });
@@ -167,11 +94,12 @@ function workerize(task, dependencies = []) {
         };
     }
     else {
-        url = URL.createObjectURL(new Blob([data], {
-            type: 'text/javascript'
-        }));
-        worker = new Worker(url);
+        // @ts-ignore
+        worker = new Worker(url, workerOptions);
         worker.onmessage = onMessageHandler;
+        worker.onerror = (error) => {
+            throw error;
+        };
         runner = async function (...args) {
             const promiseid = id();
             return new Promise(function (resolve, reject) {
@@ -188,7 +116,10 @@ function workerize(task, dependencies = []) {
         };
         store.set(runner, { worker, url });
     }
+    if (options.signal != null) {
+        options.signal.addEventListener('abort', () => dispose(runner));
+    }
     return runner;
 }
 
-export { dispose, generate, serialize, workerize };
+export { dispose, workerize };

@@ -55,16 +55,14 @@
         return Number(Math.random().toString().substring(2)).toString(36);
     }
 
-    function generate(task, dependencies = []) {
+    function generate(task, options = {}) {
         const serialized = serialize(task);
         const data = [];
-        const className = serialized.name !== '' ? serialized.name : `var${id()}`;
-        if (dependencies.length > 0) {
-            data.push(`importScripts(${dependencies.map((str) => '' + JSON.stringify(new URL(str, self.location.toString())))});`);
-        }
-        data.push(serialized.name !== '' ? serialized.body : `const ${className} = ${serialized.body}`);
+        const code = [];
+        const className = serialized.name !== '' ? serialized.name : `var${id().slice(0, 3)}`;
+        code.push(serialized.name !== '' ? serialized.body : `const ${className} = ${serialized.body}`);
         if (serialized.type == 'class') {
-            data.push(`let instance;
+            code.push(`let instance;
 self.onmessage = async function (e) {
     if (e.data.method == "constructor") {
         instance = new ${className}(...e.data.args);
@@ -78,11 +76,74 @@ self.onmessage = async function (e) {
 }`);
         }
         else {
-            data.push(`self.onmessage = async function (e) {
+            code.push(`self.onmessage = async function (e) {
         postMessage({id: e.data.id, data:${serialized.isAsync ? ' await' : ''} ${className}(...e.data.args)});
 }`);
         }
-        return data.join('\n');
+        if (!options.module) {
+            // @ts-ignore
+            if (options.dependencies.length > 0) {
+                // @ts-ignore
+                data.push(`importScripts(${options.dependencies.map((str) => '' + JSON.stringify(new URL(str, self.location.toString())))});`);
+            }
+        }
+        else {
+            // @ts-ignore
+            if (options?.dependencies?.length > 0) {
+                data.push(`const promisedModules = Promise.all(${JSON.stringify(options.dependencies?.map(dep => new URL(dep, self.location.href).href))}.map(url => import(url)));
+                
+                let modules = null;
+                `);
+                code.length = 0;
+                code.push(serialized.name !== '' ? serialized.body : `const ${className} = ${serialized.body}`);
+                if (serialized.type == 'class') {
+                    code.push(`let instance;
+self.onmessage = async function (e) {
+
+    if (modules == null) {
+    
+        modules = await promisedModules;
+    }
+    
+    if (e.data.method == "constructor") {
+        instance = new ${className}(...e.data.args);
+    } else {
+        if (Object.getPrototypeOf(instance[e.data.method]).constructor.name === "AsyncFunction") {
+            postMessage({id: e.data.id, data: await instance[e.data.method](...e.data.args)});
+        } else {
+            postMessage({id: e.data.id, data: instance[e.data.method](...e.data.args)});
+        }
+    }
+}`);
+                }
+                else {
+                    code.push(`self.onmessage = async function (e) {
+                    
+        if (modules == null) {
+        
+            modules = await promisedModules;
+        }
+    
+        postMessage({id: e.data.id, data:${serialized.isAsync ? ' await' : ''} ${className}(...e.data.args)});
+}`);
+                }
+            }
+            //
+            // @ts-ignore
+            // if (options.dependencies.length > 0) {
+            //
+            //     // @ts-ignore
+            //     data.push(`import(${options.dependencies.map((str: string) => '' + JSON.stringify(new URL(str, self.location.toString())))}).then(modules => {
+            //     console.debug(modules);
+            //         ${code.join('\n')}
+            //     });
+            //     console.debug('done');
+            //     `);
+            //
+            //     code.length = 0;
+            // }
+        }
+        return data.concat(code).join('\n');
     }
 
     /**
@@ -97,7 +158,7 @@ self.onmessage = async function (e) {
      */
     const map = new Map;
     const store = new WeakMap;
-    function dispose(...args) {
+    async function dispose(...args) {
         for (let instance of args) {
             // @ts-ignore
             const data = store.get(instance);
@@ -122,19 +183,23 @@ self.onmessage = async function (e) {
             map.delete(e.data.id);
         }
     }
-    function workerize(task, dependencies = []) {
+    // @ts-ignore
+    function workerize(task, options = {}) {
+        options = Object.assign({ dependencies: [], module: false, signal: null }, options);
         const serialized = serialize(task);
-        const data = generate(task, dependencies);
+        const data = generate(task, options);
+        const workerOptions = options.module ? { type: 'module' } : {};
         let runner;
         let url;
         let worker;
+        url = URL.createObjectURL(new Blob([data], {
+            type: 'text/javascript'
+        }));
         if (serialized.type == 'class') {
             runner = class {
                 constructor(...args) {
-                    url = URL.createObjectURL(new Blob([data], {
-                        type: 'text/javascript'
-                    }));
-                    worker = new Worker(url);
+                    // @ts-ignore
+                    worker = new Worker(url, workerOptions);
                     worker.onmessage = onMessageHandler;
                     // @ts-ignore
                     store.set(this, { worker, url });
@@ -173,11 +238,12 @@ self.onmessage = async function (e) {
             };
         }
         else {
-            url = URL.createObjectURL(new Blob([data], {
-                type: 'text/javascript'
-            }));
-            worker = new Worker(url);
+            // @ts-ignore
+            worker = new Worker(url, workerOptions);
             worker.onmessage = onMessageHandler;
+            worker.onerror = (error) => {
+                throw error;
+            };
             runner = async function (...args) {
                 const promiseid = id();
                 return new Promise(function (resolve, reject) {
@@ -194,12 +260,14 @@ self.onmessage = async function (e) {
             };
             store.set(runner, { worker, url });
         }
+        if (options.signal != null) {
+            options.signal.addEventListener('abort', () => dispose(runner));
+        }
         return runner;
     }
 
     exports.dispose = dispose;
     exports.generate = generate;
-    exports.serialize = serialize;
     exports.workerize = workerize;
 
 }));

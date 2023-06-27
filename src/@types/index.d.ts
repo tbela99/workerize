@@ -23,3 +23,9 @@ export interface SerializedTask {
 }
 
 export declare type ClassOrFunctionType<T> = Function<T> | Constructable<T>;
+
+export interface WorkerOptions {
+    dependencies?: string[];
+    module?: boolean ;
+    signal?: AbortSignal
+}

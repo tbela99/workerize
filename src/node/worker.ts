@@ -11,58 +11,63 @@
 
 import {
     serialize
-} from "./serialize";
+} from "../serialize";
 import {
     id
-} from "./id";
-import {ClassOrFunctionType, SerializedTask} from "./@types";
+} from "../id";
+import {Worker} from 'node:worker_threads';
+import {ClassOrFunctionType, SerializedTask, WorkerOptions} from "../@types";
 import {generate} from "./generate";
 
-const map: Map<string, Function[]> = new Map;
-const store: WeakMap<Function, { worker: Worker, url: string }> = new WeakMap;
+const map: Map<string, ClassOrFunctionType<Function>> = new Map;
+const store: WeakMap<ClassOrFunctionType<Function>, { worker: Worker }> = new WeakMap;
 
-export function dispose(...args: Function[]) {
+export function dispose(...args: ClassOrFunctionType<Function>[]) {
 
+    const list: Promise<any>[] = [];
     for (let instance of args) {
 
         // @ts-ignore
-        const data: { worker: Worker, url: string } | null = store.get(instance);
+        const data: { worker: Worker } | null = store.get(instance);
 
         if (data != null) {
 
-            URL.revokeObjectURL(data.url);
             store.delete(instance);
-            data.worker.terminate();
+            list.push(data.worker.terminate());
         }
     }
+    
+    return Promise.all(list);
 }
 
-function onMessageHandler(e: MessageEvent) {
+function onMessageHandler(e: { [key: string]: any }) {
 
-    const data = map.get(e.data.id);
+    const data = map.get(e.id);
 
     if (data != null) {
 
-        if (e.data.type == 'error') {
+        if (e.type == 'error') {
 
             // reject
-            data[1](e.data.data);
+            data[1](e.data);
         } else {
             //resolve
-            data[0](e.data.data);
+            data[0](e.data);
         }
 
-        map.delete(e.data.id)
+        map.delete(e.id)
     }
 }
 
-export function workerize(task: Function, dependencies: string[] = []): ClassOrFunctionType<Function> {
+export function workerize(task: Function, options: WorkerOptions = {}): ClassOrFunctionType<Function> {
 
+    options = Object.assign({dependencies: [], module: false, signal: null}, options);
     const serialized: SerializedTask = serialize(task);
-    const data: string = generate(task, dependencies);
+    const data: string = generate(task, options);
+
+    const workerOptions = {eval: true};
 
     let runner: ClassOrFunctionType<Function>;
-    let url: string;
     let worker: Worker;
 
     if (serialized.type == 'class') {
@@ -71,16 +76,12 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
             constructor(...args: any[]) {
 
-                url = URL.createObjectURL(new Blob([data], {
-                    type: 'text/javascript'
-                }));
+                worker = new Worker(data, workerOptions);
 
-                worker = new Worker(url);
-
-                worker.onmessage = onMessageHandler;
+                worker.on('message', onMessageHandler);
 
                 // @ts-ignore
-                store.set(this, {worker, url});
+                store.set(this, {worker});
 
                 function proxy(method: string) {
 
@@ -95,7 +96,7 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
                                 reject
                             ]);
 
-                            worker.onerror = reject;
+                            worker.on('error', reject);
                             worker.postMessage({
                                 id: promiseid,
                                 method,
@@ -130,12 +131,8 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
     } else {
 
-        url = URL.createObjectURL(new Blob([data], {
-            type: 'text/javascript'
-        }));
-
-        worker = new Worker(url);
-        worker.onmessage = onMessageHandler;
+        worker = new Worker(data, workerOptions);
+        worker.on('message', onMessageHandler);
 
         runner = async function (...args: any[]): Promise<any> {
 
@@ -143,7 +140,8 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
 
             return new Promise(function (resolve, reject) {
 
-                worker.onerror = reject;
+                worker.once('error', reject);
+                worker.once('messageerror', reject);
 
                 map.set(promiseid, [
                     resolve,
@@ -157,7 +155,13 @@ export function workerize(task: Function, dependencies: string[] = []): ClassOrF
             })
         }
 
-        store.set(runner, {worker, url});
+        store.set(runner, {worker});
+    }
+
+
+    if (options.signal != null) {
+
+        options.signal.addEventListener('abort', () => dispose(runner));
     }
 
     return runner;

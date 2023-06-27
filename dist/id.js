@@ -8,7 +8,8 @@
  * @license     LGPL v3
  * @license     MIT License
  */
+function id() {
+    return Number(Math.random().toString().substring(2)).toString(36);
+}
 
-export * from './serialize';
-export * from './node';
-
+export { id };
